@@ -196,7 +196,6 @@ func (scp *SecureCopier) scpFromRemote(srcUser, srcHost, srcFile, dstFile string
 						pb := NewProgressBarTo(filename, size, outPipe)
 						pb.Update(0)
 
-						//TODO: mode here
 						fw, err := os.Create(thisDstFile)
 						if err != nil {
 							ce <- err
@@ -233,14 +232,14 @@ func (scp *SecureCopier) scpFromRemote(srcUser, srcHost, srcFile, dstFile string
 							}
 							lastPercent = percent
 						}
-						//close file writer & check error
+						// close file writer & check error
 						err = fw.Close()
 						if err != nil {
 							fmt.Fprintln(errPipe, err.Error())
 							ce <- err
 							return
 						}
-						//get next byte from channel reader
+						// get next byte from channel reader
 						nb := make([]byte, 1)
 						_, err = r.Read(nb)
 						if err != nil {
@@ -248,8 +247,7 @@ func (scp *SecureCopier) scpFromRemote(srcUser, srcHost, srcFile, dstFile string
 							ce <- err
 							return
 						}
-						//TODO check value received in nb
-						//send null-byte back
+						// send null-byte back
 						_, err = cw.Write([]byte{0})
 						if err != nil {
 							fmt.Fprintln(errPipe, "Send null-byte error: "+err.Error())
@@ -257,9 +255,10 @@ func (scp *SecureCopier) scpFromRemote(srcUser, srcHost, srcFile, dstFile string
 							return
 						}
 						pb.Update(tot)
-						fmt.Fprintln(errPipe) //new line
+						// new line
+						fmt.Fprintln(errPipe)
 					} else {
-						//D command (directory)
+						// D command (directory)
 						thisDstFile := filepath.Join(dstDir, filename)
 						fileMode := os.FileMode(uint32(mode))
 						err = os.MkdirAll(thisDstFile, fileMode)
@@ -291,11 +290,9 @@ func (scp *SecureCopier) scpFromRemote(srcUser, srcHost, srcFile, dstFile string
 	if scp.IsRecursive {
 		remoteOpts += "r"
 	}
-	//TODO should this path (/usr/bin/scp) be configurable?
 	err = session.Run("/usr/bin/scp " + remoteOpts + " " + srcFile)
 	if err != nil {
 		fmt.Fprintln(errPipe, "Failed to run remote scp: "+err.Error())
 	}
 	return err
-
 }
