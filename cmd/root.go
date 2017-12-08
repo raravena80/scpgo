@@ -33,15 +33,12 @@ var (
 
 // RootCmd represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
-	Use:   "scpgo",
+	Use:   "scpgo <src> host:<dst>",
 	Short: "SCP implementation in Go",
 	Long: `This is an SCP implementation in Go.
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		//copier := new(SecureCopier)
-		//cmd.SetVersionTemplate(VERSION)
 		copier.Exec(args, os.Stdin, os.Stdout, os.Stderr)
-		//return err, status
 
 	},
 	Args:    cobra.ExactArgs(2),
@@ -71,14 +68,10 @@ func init() {
 	viper.BindPFlag("scp.quiet", RootCmd.Flags().Lookup("quiet"))
 	RootCmd.Flags().BoolVarP(&copier.IsVerbose, "verbose", "v", false, "Verbose mode - output differs from normal copier")
 	viper.BindPFlag("scp.verbose", RootCmd.Flags().Lookup("verbose"))
-	RootCmd.Flags().BoolVarP(&copier.IsCheckKnownHosts, "checkKnownHosts", "c", false, "Check known hosts - experimental!")
+	RootCmd.Flags().BoolVarP(&copier.IsCheckKnownHosts, "checkKnownHosts", "c", false, "Check known hosts")
 	viper.BindPFlag("scp.checkKnownHosts", RootCmd.Flags().Lookup("checkKnownHosts"))
 	RootCmd.Flags().StringVarP(&copier.KeyFile, "keyFile", "k", "", "Use this keyfile to authenticate")
 	viper.BindPFlag("scp.keyfile", RootCmd.Flags().Lookup("keyfile"))
-	/*RootCmd.Flags().StringVarP(&copier.Src, "source", "s", "", "Source <host>:<path> or <path>")
-	viper.BindPFlag("scp.source", RootCmd.Flags().Lookup("source"))
-	RootCmd.Flags().StringVarP(&copier.Dst, "destination", "d", "", "Destination <host>:<path> or <path>")
-	viper.BindPFlag("scp.destination", RootCmd.Flags().Lookup("destination"))*/
 }
 
 // initConfig reads in config file and ENV variables if set.
