@@ -40,7 +40,7 @@ workdir:
 build: workdir/scpgo
 
 build-native: $(GOFILES)
-	go build $(GO_LDFLAGS) -o workdir/scpgo .
+	CGO_ENABLED=0 go build $(GO_LDFLAGS) -o workdir/scpgo .
 
 workdir/scpgo: $(GOFILES)
 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build $(GO_LDFLAGS) -o workdir/scpgo.linux.amd64 .
