@@ -8,17 +8,15 @@ sudo: required
 go:
   - 1.8.x
   - 1.9.x
-  - master
 
 jobs:
   fast_finish: true
   include:
+    - stage: dependencies
+      script: go get -t ./...
     - stage: test
       script:
         - make test
-    - stage: deploy
-      script:
-        - make
 notifications:
   email:
     on_success: change
