@@ -9,12 +9,14 @@ go:
   - 1.8.x
   - 1.9.x
 
+script:
+  - 'if [ "${JOB}" = "test" ]; then go get -t ./...; fi'
+
 jobs:
   fast_finish: true
   include:
     - stage: test
       script:
-        - go get -t ./...
         - make test
 notifications:
   email:
