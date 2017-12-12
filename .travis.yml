@@ -1,0 +1,25 @@
+language: go
+
+install: true
+
+sudo: required
+
+# test stage automatically added for each go version
+go:
+  - 1.8.x
+  - 1.9.x
+  - master
+
+jobs:
+  fast_finish: true
+  include:
+    - stage: test
+      script:
+        - make test
+    - stage: deploy
+      script:
+        - make
+notifications:
+  email:
+    on_success: change
+    on_failure: always
