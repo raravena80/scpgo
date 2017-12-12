@@ -12,10 +12,9 @@ go:
 jobs:
   fast_finish: true
   include:
-    - stage: dependencies
-      script: go get -t ./...
     - stage: test
       script:
+        - go get -t ./...
         - make test
 notifications:
   email:
