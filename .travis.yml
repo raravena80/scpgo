@@ -6,8 +6,10 @@ sudo: required
 
 # test stage automatically added for each go version
 go:
+  - 1.7.x
   - 1.8.x
   - 1.9.x
+  - master
 
 script:
   - 'if [ "${JOB}" = "test" ]; then go get -t ./...; fi'
