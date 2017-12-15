@@ -29,18 +29,16 @@ func TestAgentClientDefault(t *testing.T) {
 	}{
 		{
 			name:     "Basic Agent Client Default",
-			socket:   os.Getenv("SSH_AUTH_SOCK"),
+			socket:   "",
 			expected: nil,
 		},
 	}
 	socketSave := os.Getenv("SSH_AUTH_SOCK")
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			os.Setenv("SSH_AUTH_SOCK", tt.socket)
 			_, returned := AgentClientDefault()
 			if !reflect.DeepEqual(returned, tt.expected) {
 				t.Errorf("Value received: %v expected %v", returned, tt.expected)
-				fmt.Println(reflect.TypeOf(returned))
 			}
 		})
 	}
