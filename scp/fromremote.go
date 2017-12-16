@@ -123,7 +123,7 @@ func (scp *SecureCopier) scpFromRemote(srcUser, srcHost, srcFile, dstFile string
 				}
 				err = sendByte(cw, 0)
 				if err != nil {
-					fmt.Fprintln(errPipe, "Write error: %s", err.Error())
+					fmt.Fprintln(errPipe, "Write error: "+err.Error())
 					ce <- err
 					return
 				}
