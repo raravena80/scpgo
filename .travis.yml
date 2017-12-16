@@ -12,15 +12,9 @@ go:
   - master
 
 script:
-  - 'if [ "${JOB}" = "test" ]; then go get -t ./...; fi'
+  - go get -t ./...
+  - make test
 
-jobs:
-  fast_finish: true
-  include:
-    - stage: test
-      script:
-        - go get -t ./...
-        - make test
 notifications:
   email:
     on_success: change
