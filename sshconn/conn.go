@@ -36,6 +36,7 @@ func loadKeyring(idFile string) (ssh.Signer, error) {
 	return s, err
 }
 
+// FillDefaultUsername Returns the default username according to the env
 func FillDefaultUsername(userName string) string {
 	if userName == "" {
 		u, err := user.Current()
@@ -53,6 +54,7 @@ func FillDefaultUsername(userName string) string {
 	return userName
 }
 
+// Connect Main function that establishes connection
 func Connect(userName, host string, port int, idFile string, checkKnownHosts bool, verbose bool, errPipe io.Writer) (*ssh.Session, error) {
 	signers := []ssh.Signer{}
 	userName = FillDefaultUsername(userName)

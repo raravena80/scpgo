@@ -19,22 +19,26 @@ import (
 	"github.com/howeyc/gopass"
 )
 
+// PasswordPrompt Struct for the password prompt
 type PasswordPrompt struct {
 	UserName string
 	Host     string
 	password string
 }
 
+// ClientAuthPrompt Main creator for the Auth prompt
 func ClientAuthPrompt(userName, host string) string {
 	pp := NewPasswordPrompt(userName, host)
 	p, _ := pp.Password(userName)
 	return p
 }
 
+// NewPasswordPrompt Main constructor for the password prompt
 func NewPasswordPrompt(userName, host string) PasswordPrompt {
 	return PasswordPrompt{userName, host, ""}
 }
 
+// Password Main function that gets the passwrod from the system
 func (p PasswordPrompt) Password(userName string) (string, error) {
 	if userName != "" {
 		p.UserName = userName

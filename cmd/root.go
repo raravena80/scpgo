@@ -28,10 +28,11 @@ var (
 	err     error
 	cfgFile string
 	copier  scp.SecureCopier
+	// Version For the command
 	Version string
 )
 
-// RootCmd represents the base command when called without any subcommands
+// RootCmd Represents the base command when called without any subcommands
 var RootCmd = &cobra.Command{
 	Use:   "scpgo <src> host:<dst>",
 	Short: "SCP implementation in Go",
@@ -45,7 +46,7 @@ var RootCmd = &cobra.Command{
 	Version: Version,
 }
 
-// This is called by main.main(). It only needs to happen once to the rootCmd.
+// Execute This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	if err := RootCmd.Execute(); err != nil {
 		os.Exit(1)
