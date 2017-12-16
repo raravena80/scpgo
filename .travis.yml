@@ -12,7 +12,11 @@ go:
   - master
 
 script:
+  - go get github.com/raravena80/gotestsshd
+  - go get github.com/raravena80/gotestsshagent
   - go get -t ./...
+  - gotestsshd & > /dev/null 2>&1
+  - gotestsshagent & > /dev/null 2>&1
   - make test
 
 notifications:
