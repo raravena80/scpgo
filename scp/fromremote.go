@@ -80,7 +80,6 @@ func (scp *SecureCopier) scpFromRemote(srcUser, srcHost, srcFile, dstFile string
 			ce <- err
 			return
 		}
-		defer r.Close()
 		// use a scanner for processing individual commands, but not files themselves
 		scanner := bufio.NewScanner(r)
 		more := true
