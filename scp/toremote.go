@@ -74,7 +74,7 @@ func (scp *SecureCopier) sendDir(procWriter io.Writer, srcPath string, srcFileIn
 }
 
 func (scp *SecureCopier) sendFile(procWriter io.Writer, srcPath string, srcFileInfo os.FileInfo, outPipe io.Writer, errPipe io.Writer) error {
-	//single file
+	// single file
 	mode := uint32(srcFileInfo.Mode().Perm())
 	fileReader, err := os.Open(srcPath)
 	if err != nil {
@@ -92,7 +92,7 @@ func (scp *SecureCopier) sendFile(procWriter io.Writer, srcPath string, srcFileI
 	if err != nil {
 		return err
 	}
-	//TODO buffering
+	// TODO buffering
 	_, err = io.Copy(procWriter, fileReader)
 	if err != nil {
 		return err
@@ -116,7 +116,7 @@ func (scp *SecureCopier) sendFile(procWriter io.Writer, srcPath string, srcFileI
 	return err
 }
 
-//to-scp
+// to scp
 func (scp *SecureCopier) scpToRemote(srcFile, dstUser, dstHost, dstFile string, outPipe io.Writer, errPipe io.Writer) error {
 
 	srcFileInfo, err := os.Stat(srcFile)
@@ -134,7 +134,6 @@ func (scp *SecureCopier) scpToRemote(srcFile, dstUser, dstHost, dstFile string, 
 	ce := make(chan error)
 	if dstFile == "" {
 		dstFile = filepath.Base(srcFile)
-		//dstFile = "."
 	}
 	go func() {
 		procWriter, err := session.StdinPipe()

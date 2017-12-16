@@ -48,7 +48,7 @@ func (scp *SecureCopier) scpFromRemote(srcUser, srcHost, srcFile, dstFile string
 		dstDir = filepath.Dir(dstFile)
 		useSpecifiedFilename = true
 	}
-	//from-scp
+	// from scp
 	session, err := sshconn.Connect(srcUser, srcHost, scp.Port, scp.KeyFile, scp.IsCheckKnownHosts, scp.IsVerbose, errPipe)
 	if err != nil {
 		return err
@@ -80,8 +80,8 @@ func (scp *SecureCopier) scpFromRemote(srcUser, srcHost, srcFile, dstFile string
 			ce <- err
 			return
 		}
-		//defer r.Close()
-		//use a scanner for processing individual commands, but not files themselves
+		defer r.Close()
+		// use a scanner for processing individual commands, but not files themselves
 		scanner := bufio.NewScanner(r)
 		more := true
 		first := true
@@ -90,7 +90,7 @@ func (scp *SecureCopier) scpFromRemote(srcUser, srcHost, srcFile, dstFile string
 			n, err := r.Read(cmdArr)
 			if err != nil {
 				if err == io.EOF {
-					//no problem.
+					// no problem.
 					if scp.IsVerbose {
 						fmt.Fprintln(errPipe, "Received EOF from remote server")
 					}
@@ -111,12 +111,12 @@ func (scp *SecureCopier) scpFromRemote(srcUser, srcHost, srcFile, dstFile string
 			}
 			switch cmd {
 			case 0x0:
-				//continue
+				// continue
 				if scp.IsVerbose {
 					fmt.Fprintf(errPipe, "Received OK \n")
 				}
 			case 'E':
-				//E command: go back out of dir
+				// E command: go back out of dir
 				dstDir = filepath.Dir(dstDir)
 				if scp.IsVerbose {
 					fmt.Fprintf(errPipe, "Received End-Dir\n")
@@ -128,7 +128,7 @@ func (scp *SecureCopier) scpFromRemote(srcUser, srcHost, srcFile, dstFile string
 					return
 				}
 			case 0xA:
-				//0xA command: end?
+				// 0xA command: end?
 				if scp.IsVerbose {
 					fmt.Fprintf(errPipe, "Received All-done\n")
 				}
@@ -146,7 +146,7 @@ func (scp *SecureCopier) scpFromRemote(srcUser, srcHost, srcFile, dstFile string
 				err = scanner.Err()
 				if err != nil {
 					if err == io.EOF {
-						//no problem.
+						// no problem.
 						if scp.IsVerbose {
 							fmt.Fprintln(errPipe, "Received EOF from remote server")
 						}
@@ -156,12 +156,12 @@ func (scp *SecureCopier) scpFromRemote(srcUser, srcHost, srcFile, dstFile string
 					}
 					return
 				}
-				//first line
+				// first line
 				cmdFull := scanner.Text()
 				if scp.IsVerbose {
 					fmt.Fprintf(errPipe, "Details: %v\n", cmdFull)
 				}
-				//remainder, split by spaces
+				// remainder, split by spaces
 				parts := strings.SplitN(cmdFull, " ", 3)
 
 				switch cmd {
@@ -188,7 +188,7 @@ func (scp *SecureCopier) scpFromRemote(srcUser, srcHost, srcFile, dstFile string
 						fmt.Fprintf(errPipe, "Mode: %d, size: %d, filename: %s\n", mode, size, rcvFilename)
 					}
 					var filename string
-					//use the specified filename from the destination (only for top-level item)
+					// use the specified filename from the destination (only for top-level item)
 					if useSpecifiedFilename && first {
 						filename = filepath.Base(dstFile)
 					} else {
@@ -201,7 +201,7 @@ func (scp *SecureCopier) scpFromRemote(srcUser, srcHost, srcFile, dstFile string
 						return
 					}
 					if cmd == 'C' {
-						//C command - file
+						// C command - file
 						thisDstFile := filepath.Join(dstDir, filename)
 						if scp.IsVerbose {
 							fmt.Fprintln(errPipe, "Creating destination file: ", thisDstFile)
@@ -218,7 +218,7 @@ func (scp *SecureCopier) scpFromRemote(srcUser, srcHost, srcFile, dstFile string
 						}
 						defer fw.Close()
 
-						//buffered by 4096 bytes
+						// buffered by 4096 bytes
 						bufferSize := int64(4096)
 						lastPercent := int64(0)
 						for tot < size {
@@ -233,7 +233,7 @@ func (scp *SecureCopier) scpFromRemote(srcUser, srcHost, srcFile, dstFile string
 								return
 							}
 							tot += int64(n)
-							//write to file
+							// write to file
 							_, err = fw.Write(b[:n])
 							if err != nil {
 								fmt.Fprintln(errPipe, "Write error: "+err.Error())
