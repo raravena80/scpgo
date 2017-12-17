@@ -146,16 +146,8 @@ func (scp *SecureCopier) scpToRemote(srcFile, dstUser, dstHost, dstFile string, 
 		if scp.IsRecursive {
 			if srcFileInfo.IsDir() {
 				err = scp.processDir(procWriter, srcFile, srcFileInfo, outPipe, errPipe)
-				if err != nil {
-					fmt.Fprintln(errPipe, err.Error())
-					ce <- err
-				}
 			} else {
 				err = scp.sendFile(procWriter, srcFile, srcFileInfo, outPipe, errPipe)
-				if err != nil {
-					fmt.Fprintln(errPipe, err.Error())
-					ce <- err
-				}
 			}
 		} else {
 			if srcFileInfo.IsDir() {
@@ -163,11 +155,11 @@ func (scp *SecureCopier) scpToRemote(srcFile, dstUser, dstHost, dstFile string, 
 				return
 			}
 			err = scp.sendFile(procWriter, srcFile, srcFileInfo, outPipe, errPipe)
-			if err != nil {
-				fmt.Fprintln(errPipe, err.Error())
-				ce <- err
-			}
 
+		}
+		if err != nil {
+			fmt.Fprintln(errPipe, err.Error())
+			ce <- err
 		}
 		err = procWriter.Close()
 		if err != nil {
