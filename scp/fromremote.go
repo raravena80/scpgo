@@ -159,151 +159,7 @@ func (scp *SecureCopier) doFromRemote(session *ssh.Session, errPipe io.Writer, o
 
 			return
 		default:
-			scanner.Scan()
-			err = scanner.Err()
-			if err != nil {
-				if err == io.EOF {
-					// no problem.
-					if scp.IsVerbose {
-						fmt.Fprintln(errPipe, "Received EOF from remote server")
-					}
-				} else {
-					fmt.Fprintln(errPipe, "Error reading standard input:", err)
-					ce <- err
-				}
-				return
-			}
-			// first line
-			cmdFull := scanner.Text()
-			if scp.IsVerbose {
-				fmt.Fprintf(errPipe, "Details: %v\n", cmdFull)
-			}
-			// remainder, split by spaces
-			parts := strings.SplitN(cmdFull, " ", 3)
-
-			switch cmd {
-			case 0x1:
-				fmt.Fprintf(errPipe, "Received error message: %s\n", cmdFull[1:])
-				ce <- errors.New(cmdFull[1:])
-				return
-			case 'D', 'C':
-				mode, err := strconv.ParseInt(parts[0], 8, 32)
-				if err != nil {
-					fmt.Fprintln(errPipe, "Format error: "+err.Error())
-					ce <- err
-					return
-				}
-				sizeUint, err := strconv.ParseUint(parts[1], 10, 64)
-				size := int64(sizeUint)
-				if err != nil {
-					fmt.Fprintln(errPipe, "Format error: "+err.Error())
-					ce <- err
-					return
-				}
-				rcvFilename := parts[2]
-				if scp.IsVerbose {
-					fmt.Fprintf(errPipe, "Mode: %d, size: %d, filename: %s\n", mode, size, rcvFilename)
-				}
-				var filename string
-				// use the specified filename from the destination (only for top-level item)
-				if useSpecifiedFilename && first {
-					filename = filepath.Base(dstFile)
-				} else {
-					filename = rcvFilename
-				}
-				err = sendByte(cw, 0)
-				if err != nil {
-					fmt.Fprintln(errPipe, "Send error: "+err.Error())
-					ce <- err
-					return
-				}
-				if cmd == 'C' {
-					// C command - file
-					thisDstFile := filepath.Join(dstDir, filename)
-					if scp.IsVerbose {
-						fmt.Fprintln(errPipe, "Creating destination file: ", thisDstFile)
-					}
-					tot := int64(0)
-					pb := NewProgressBarTo(filename, size, outPipe)
-					pb.Update(0)
-
-					fw, err := os.Create(thisDstFile)
-					if err != nil {
-						ce <- err
-						fmt.Fprintln(errPipe, "File creation error: "+err.Error())
-						return
-					}
-					defer fw.Close()
-
-					// buffered by 4096 bytes
-					bufferSize := int64(4096)
-					lastPercent := int64(0)
-					for tot < size {
-						if bufferSize > size-tot {
-							bufferSize = size - tot
-						}
-						b := make([]byte, bufferSize)
-						n, err = r.Read(b)
-						if err != nil {
-							fmt.Fprintln(errPipe, "Read error: "+err.Error())
-							ce <- err
-							return
-						}
-						tot += int64(n)
-						// write to file
-						_, err = fw.Write(b[:n])
-						if err != nil {
-							fmt.Fprintln(errPipe, "Write error: "+err.Error())
-							ce <- err
-							return
-						}
-						percent := (100 * tot) / size
-						if percent > lastPercent {
-							pb.Update(tot)
-						}
-						lastPercent = percent
-					}
-					// close file writer & check error
-					err = fw.Close()
-					if err != nil {
-						fmt.Fprintln(errPipe, err.Error())
-						ce <- err
-						return
-					}
-					// get next byte from channel reader
-					nb := make([]byte, 1)
-					_, err = r.Read(nb)
-					if err != nil {
-						fmt.Fprintln(errPipe, err.Error())
-						ce <- err
-						return
-					}
-					// send null-byte back
-					_, err = cw.Write([]byte{0})
-					if err != nil {
-						fmt.Fprintln(errPipe, "Send null-byte error: "+err.Error())
-						ce <- err
-						return
-					}
-					pb.Update(tot)
-					// new line
-					fmt.Fprintln(errPipe)
-				} else {
-					// D command (directory)
-					thisDstFile := filepath.Join(dstDir, filename)
-					fileMode := os.FileMode(uint32(mode))
-					err = os.MkdirAll(thisDstFile, fileMode)
-					if err != nil {
-						fmt.Fprintln(errPipe, "Mkdir error: "+err.Error())
-						ce <- err
-						return
-					}
-					dstDir = thisDstFile
-				}
-			default:
-				fmt.Fprintf(errPipe, "Command '%v' NOT implemented\n", cmd)
-				return
-			}
+			scp.handleDefault(scanner, cmd, first, cw, r, n, errPipe, outPipe, dstDir, dstFile, useSpecifiedFilename, ce)
 		}
 		first = false
 	}
@@ -311,6 +167,155 @@ func (scp *SecureCopier) doFromRemote(session *ssh.Session, errPipe io.Writer, o
 	if err != nil {
 		fmt.Fprintln(errPipe, "error closing process writer: ", err.Error())
 		ce <- err
+		return
+	}
+}
+
+// This is kind of ugly but reduces complexity for now
+func (scp *SecureCopier) handleDefault(scanner *bufio.Scanner, cmd byte, first bool, cw io.WriteCloser, r io.Reader, n int, errPipe io.Writer, outPipe io.Writer, dstDir string, dstFile string, useSpecifiedFilename bool, ce chan<- error) {
+	scanner.Scan()
+	err := scanner.Err()
+	if err != nil {
+		if err == io.EOF {
+			// no problem.
+			if scp.IsVerbose {
+				fmt.Fprintln(errPipe, "Received EOF from remote server")
+			}
+		} else {
+			fmt.Fprintln(errPipe, "Error reading standard input:", err)
+			ce <- err
+		}
+		return
+	}
+	// first line
+	cmdFull := scanner.Text()
+	if scp.IsVerbose {
+		fmt.Fprintf(errPipe, "Details: %v\n", cmdFull)
+	}
+	// remainder, split by spaces
+	parts := strings.SplitN(cmdFull, " ", 3)
+
+	switch cmd {
+	case 0x1:
+		fmt.Fprintf(errPipe, "Received error message: %s\n", cmdFull[1:])
+		ce <- errors.New(cmdFull[1:])
+		return
+	case 'D', 'C':
+		mode, err := strconv.ParseInt(parts[0], 8, 32)
+		if err != nil {
+			fmt.Fprintln(errPipe, "Format error: "+err.Error())
+			ce <- err
+			return
+		}
+		sizeUint, err := strconv.ParseUint(parts[1], 10, 64)
+		size := int64(sizeUint)
+		if err != nil {
+			fmt.Fprintln(errPipe, "Format error: "+err.Error())
+			ce <- err
+			return
+		}
+		rcvFilename := parts[2]
+		if scp.IsVerbose {
+			fmt.Fprintf(errPipe, "Mode: %d, size: %d, filename: %s\n", mode, size, rcvFilename)
+		}
+		var filename string
+		// use the specified filename from the destination (only for top-level item)
+		if useSpecifiedFilename && first {
+			filename = filepath.Base(dstFile)
+		} else {
+			filename = rcvFilename
+		}
+		err = sendByte(cw, 0)
+		if err != nil {
+			fmt.Fprintln(errPipe, "Send error: "+err.Error())
+			ce <- err
+			return
+		}
+		if cmd == 'C' {
+			// C command - file
+			thisDstFile := filepath.Join(dstDir, filename)
+			if scp.IsVerbose {
+				fmt.Fprintln(errPipe, "Creating destination file: ", thisDstFile)
+			}
+			tot := int64(0)
+			pb := NewProgressBarTo(filename, size, outPipe)
+			pb.Update(0)
+
+			fw, err := os.Create(thisDstFile)
+			if err != nil {
+				ce <- err
+				fmt.Fprintln(errPipe, "File creation error: "+err.Error())
+				return
+			}
+			defer fw.Close()
+
+			// buffered by 4096 bytes
+			bufferSize := int64(4096)
+			lastPercent := int64(0)
+			for tot < size {
+				if bufferSize > size-tot {
+					bufferSize = size - tot
+				}
+				b := make([]byte, bufferSize)
+				n, err = r.Read(b)
+				if err != nil {
+					fmt.Fprintln(errPipe, "Read error: "+err.Error())
+					ce <- err
+					return
+				}
+				tot += int64(n)
+				// write to file
+				_, err = fw.Write(b[:n])
+				if err != nil {
+					fmt.Fprintln(errPipe, "Write error: "+err.Error())
+					ce <- err
+					return
+				}
+				percent := (100 * tot) / size
+				if percent > lastPercent {
+					pb.Update(tot)
+				}
+				lastPercent = percent
+			}
+			// close file writer & check error
+			err = fw.Close()
+			if err != nil {
+				fmt.Fprintln(errPipe, err.Error())
+				ce <- err
+				return
+			}
+			// get next byte from channel reader
+			nb := make([]byte, 1)
+			_, err = r.Read(nb)
+			if err != nil {
+				fmt.Fprintln(errPipe, err.Error())
+				ce <- err
+				return
+			}
+			// send null-byte back
+			_, err = cw.Write([]byte{0})
+			if err != nil {
+				fmt.Fprintln(errPipe, "Send null-byte error: "+err.Error())
+				ce <- err
+				return
+			}
+			pb.Update(tot)
+			// new line
+			fmt.Fprintln(errPipe)
+		} else {
+			// D command (directory)
+			thisDstFile := filepath.Join(dstDir, filename)
+			fileMode := os.FileMode(uint32(mode))
+			err = os.MkdirAll(thisDstFile, fileMode)
+			if err != nil {
+				fmt.Fprintln(errPipe, "Mkdir error: "+err.Error())
+				ce <- err
+				return
+			}
+			dstDir = thisDstFile
+		}
+	default:
+		fmt.Fprintf(errPipe, "Command '%v' NOT implemented\n", cmd)
 		return
 	}
 }
