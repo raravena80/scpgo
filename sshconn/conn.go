@@ -17,7 +17,7 @@ package sshconn
 import (
 	"fmt"
 	homedir "github.com/mitchellh/go-homedir"
-	"github.com/raravena80/scpgo/pwauth"
+	//	"github.com/raravena80/scpgo/pwauth"
 	"github.com/raravena80/scpgo/sshagent"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
