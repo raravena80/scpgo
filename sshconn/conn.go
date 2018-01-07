@@ -98,6 +98,8 @@ func Connect(userName, host string, port int, idFile string, checkKnownHosts boo
 			fmt.Fprintln(errPipe, "Failed to known_hosts "+err.Error())
 			return nil, err
 		}
+	} else {
+		clientConfig.HostKeyCallback = ssh.InsecureIgnoreHostKey()
 	}
 	target := fmt.Sprintf("%s:%d", host, port)
 	client, err := ssh.Dial("tcp", target, clientConfig)
