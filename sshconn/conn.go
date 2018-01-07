@@ -78,9 +78,9 @@ func Connect(userName, host string, port int, idFile string, checkKnownHosts boo
 	pubKeyAuth := ssh.PublicKeys(signers...)
 	auths = append(auths, pubKeyAuth)
 	// Add password authentication
-	password := pwauth.ClientAuthPrompt(userName, host)
+	/*password := pwauth.ClientAuthPrompt(userName, host)
 	passwordAuth := ssh.Password(password)
-	auths = append(auths, passwordAuth)
+	auths = append(auths, passwordAuth)*/
 
 	clientConfig := &ssh.ClientConfig{
 		User: userName,
