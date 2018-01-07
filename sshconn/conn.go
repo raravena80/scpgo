@@ -17,7 +17,7 @@ package sshconn
 import (
 	"fmt"
 	homedir "github.com/mitchellh/go-homedir"
-	"github.com/raravena80/scpgo/pwauth"
+	//	"github.com/raravena80/scpgo/pwauth"
 	"github.com/raravena80/scpgo/sshagent"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/knownhosts"
@@ -78,9 +78,9 @@ func Connect(userName, host string, port int, idFile string, checkKnownHosts boo
 	pubKeyAuth := ssh.PublicKeys(signers...)
 	auths = append(auths, pubKeyAuth)
 	// Add password authentication
-	password := pwauth.ClientAuthPrompt(userName, host)
+	/*password := pwauth.ClientAuthPrompt(userName, host)
 	passwordAuth := ssh.Password(password)
-	auths = append(auths, passwordAuth)
+	auths = append(auths, passwordAuth)*/
 
 	clientConfig := &ssh.ClientConfig{
 		User: userName,
