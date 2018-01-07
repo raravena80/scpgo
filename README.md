@@ -1,4 +1,5 @@
 # scpgo [![Apache Licensed](https://img.shields.io/badge/license-Apache2.0-blue.svg)](https://raw.githubusercontent.com/raravena80/scpgo/master/LICENSE) [![Build Status](https://travis-ci.org/raravena80/scpgo.svg?branch=master)](https://travis-ci.org/raravena80/scpgo) [![Go Report Card](https://goreportcard.com/badge/github.com/raravena80/scpgo)](https://goreportcard.com/report/github.com/raravena80/scpgo)
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fraravena80%2Fscpgo.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fraravena80%2Fscpgo?ref=badge_shield)
 
 Go SCP Implementation using the std golang.org/x/crypto/ssh libraries
 
@@ -20,3 +21,7 @@ Flags:
   -r, --recursive         Recursive copy
   -v, --verbose           Verbose mode - output differs from normal copier
 ```
+
+
+## License
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fraravena80%2Fscpgo.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fraravena80%2Fscpgo?ref=badge_large)
