@@ -51,7 +51,7 @@ func (scp *SecureCopier) scpFromRemote(srcUser, srcHost, srcFile, dstFile string
 		useSpecifiedFilename = true
 	}
 	// from scp
-	session, err := sshconn.Connect(srcUser, srcHost, scp.Port, scp.KeyFile, scp.IsCheckKnownHosts, scp.IsVerbose, errPipe)
+	session, err := sshconn.Connect(srcUser, srcHost, scp.Port, scp.KeyFile, scp.Password, scp.IsCheckKnownHosts, scp.IsVerbose, errPipe)
 	if err != nil {
 		return err
 	} else if scp.IsVerbose {

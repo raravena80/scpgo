@@ -55,7 +55,7 @@ func FillDefaultUsername(userName string) string {
 }
 
 // Connect Main function that establishes connection
-func Connect(userName, host string, port int, idFile string, checkKnownHosts bool, verbose bool, errPipe io.Writer) (*ssh.Session, error) {
+func Connect(userName, host string, port int, idFile string, password string, checkKnownHosts bool, verbose bool, errPipe io.Writer) (*ssh.Session, error) {
 	signers := []ssh.Signer{}
 	userName = FillDefaultUsername(userName)
 	if idFile != "" {
@@ -78,10 +78,11 @@ func Connect(userName, host string, port int, idFile string, checkKnownHosts boo
 	pubKeyAuth := ssh.PublicKeys(signers...)
 	auths = append(auths, pubKeyAuth)
 	// Add password authentication
-	/*password := pwauth.ClientAuthPrompt(userName, host)
-	passwordAuth := ssh.Password(password)
-	auths = append(auths, passwordAuth)*/
-
+	if password != "" {
+		password := pwauth.ClientAuthPrompt(userName, host)
+		passwordAuth := ssh.Password(password)
+		auths = append(auths, passwordAuth)
+	}
 	clientConfig := &ssh.ClientConfig{
 		User: userName,
 		Auth: auths,
@@ -116,5 +117,4 @@ func Connect(userName, host string, port int, idFile string, checkKnownHosts boo
 		}
 	}
 	return session, err
-
 }
