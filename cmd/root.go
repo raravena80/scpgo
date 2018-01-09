@@ -72,7 +72,7 @@ func init() {
 	viper.BindPFlag("scp.checkKnownHosts", RootCmd.Flags().Lookup("checkKnownHosts"))
 	RootCmd.Flags().StringVarP(&copier.KeyFile, "keyFile", "k", "", "Use this keyfile to authenticate")
 	viper.BindPFlag("scp.keyfile", RootCmd.Flags().Lookup("keyfile"))
-	RootCmd.Flags().StringVarP(&copier.Password, "password", "P", "", "Specify password")
+	RootCmd.Flags().BoolVarP(&copier.Password, "password", "P", false, "Prompt for password input")
 	viper.BindPFlag("scp.password", RootCmd.Flags().Lookup("password"))
 }
 
