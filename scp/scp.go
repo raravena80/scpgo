@@ -31,7 +31,7 @@ type SecureCopier struct {
 	IsQuiet           bool
 	IsVerbose         bool
 	IsCheckKnownHosts bool
-	Password          string
+	Password          bool
 	KeyFile           string
 	srcHost           string
 	srcUser           string
