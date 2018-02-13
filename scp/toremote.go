@@ -23,9 +23,9 @@ import (
 	"path/filepath"
 )
 
-func (scp *SecureCopier) processDir(procWriter io.Writer, srcFilePath string, srcFileInfo os.FileInfo, outPipe io.Writer, errPipe io.Writer) error {
+func (scp *SecureCopier) processDir(procWriter io.Writer, srcFilePath string, srcFileInfo os.FileInfo) error {
 
-	err := scp.sendDir(procWriter, srcFilePath, srcFileInfo, errPipe)
+	err := scp.sendDir(procWriter, srcFilePath, srcFileInfo)
 	if err != nil {
 		return err
 	}
@@ -39,41 +39,41 @@ func (scp *SecureCopier) processDir(procWriter io.Writer, srcFilePath string, sr
 	}
 	for _, fi := range fis {
 		if fi.IsDir() {
-			err = scp.processDir(procWriter, filepath.Join(srcFilePath, fi.Name()), fi, outPipe, errPipe)
+			err = scp.processDir(procWriter, filepath.Join(srcFilePath, fi.Name()), fi)
 			if err != nil {
 				return err
 			}
 		} else {
-			err = scp.sendFile(procWriter, filepath.Join(srcFilePath, fi.Name()), fi, outPipe, errPipe)
+			err = scp.sendFile(procWriter, filepath.Join(srcFilePath, fi.Name()), fi)
 			if err != nil {
 				return err
 			}
 		}
 	}
-	err = scp.sendEndDir(procWriter, errPipe)
+	err = scp.sendEndDir(procWriter)
 	return err
 }
 
-func (scp *SecureCopier) sendEndDir(procWriter io.Writer, errPipe io.Writer) error {
+func (scp *SecureCopier) sendEndDir(procWriter io.Writer) error {
 	header := fmt.Sprintf("E\n")
 	if scp.IsVerbose {
-		fmt.Fprintf(errPipe, "Sending end dir: %s", header)
+		fmt.Fprintf(scp.errPipe, "Sending end dir: %s", header)
 	}
 	_, err := procWriter.Write([]byte(header))
 	return err
 }
 
-func (scp *SecureCopier) sendDir(procWriter io.Writer, srcPath string, srcFileInfo os.FileInfo, errPipe io.Writer) error {
+func (scp *SecureCopier) sendDir(procWriter io.Writer, srcPath string, srcFileInfo os.FileInfo) error {
 	mode := uint32(srcFileInfo.Mode().Perm())
 	header := fmt.Sprintf("D%04o 0 %s\n", mode, filepath.Base(srcPath))
 	if scp.IsVerbose {
-		fmt.Fprintf(errPipe, "Sending Dir header : %s", header)
+		fmt.Fprintf(scp.errPipe, "Sending Dir header : %s", header)
 	}
 	_, err := procWriter.Write([]byte(header))
 	return err
 }
 
-func (scp *SecureCopier) sendFile(procWriter io.Writer, srcPath string, srcFileInfo os.FileInfo, outPipe io.Writer, errPipe io.Writer) error {
+func (scp *SecureCopier) sendFile(procWriter io.Writer, srcPath string, srcFileInfo os.FileInfo) error {
 	// single file
 	mode := uint32(srcFileInfo.Mode().Perm())
 	fileReader, err := os.Open(srcPath)
@@ -84,9 +84,9 @@ func (scp *SecureCopier) sendFile(procWriter io.Writer, srcPath string, srcFileI
 	size := srcFileInfo.Size()
 	header := fmt.Sprintf("C%04o %d %s\n", mode, size, filepath.Base(srcPath))
 	if scp.IsVerbose {
-		fmt.Fprintf(errPipe, "Sending File header: %s", header)
+		fmt.Fprintf(scp.errPipe, "Sending File header: %s", header)
 	}
-	pb := NewProgressBarTo(srcPath, size, outPipe)
+	pb := NewProgressBarTo(srcPath, size, scp.outPipe)
 	pb.Update(0)
 	_, err = procWriter.Write([]byte(header))
 	if err != nil {
@@ -105,30 +105,30 @@ func (scp *SecureCopier) sendFile(procWriter io.Writer, srcPath string, srcFileI
 
 	err = fileReader.Close()
 	if scp.IsVerbose {
-		fmt.Fprintln(errPipe, "Sent file plus null-byte.")
+		fmt.Fprintln(scp.errPipe, "Sent file plus null-byte.")
 	}
 	pb.Update(size)
-	fmt.Fprintln(errPipe)
+	fmt.Fprintln(scp.errPipe)
 
 	if err != nil {
-		fmt.Fprintln(errPipe, err.Error())
+		fmt.Fprintln(scp.errPipe, err.Error())
 	}
 	return err
 }
 
 // to scp
-func (scp *SecureCopier) scpToRemote(srcFile, dstUser, dstHost, dstFile string, outPipe io.Writer, errPipe io.Writer) error {
+func (scp *SecureCopier) scpToRemote(srcFile, dstUser, dstHost, dstFile string) error {
 
 	srcFileInfo, err := os.Stat(srcFile)
 	if err != nil {
-		fmt.Fprintln(errPipe, "Could not stat source file "+srcFile)
+		fmt.Fprintln(scp.errPipe, "Could not stat source file "+srcFile)
 		return err
 	}
-	session, err := sshconn.Connect(dstUser, dstHost, scp.Port, scp.KeyFile, scp.Password, scp.IsCheckKnownHosts, scp.IsVerbose, errPipe)
+	session, err := sshconn.Connect(dstUser, dstHost, scp.Port, scp.KeyFile, scp.Password, scp.IsCheckKnownHosts, scp.IsVerbose, scp.errPipe)
 	if err != nil {
 		return err
 	} else if scp.IsVerbose {
-		fmt.Fprintln(errPipe, "Got session")
+		fmt.Fprintln(scp.errPipe, "Got session")
 	}
 	defer session.Close()
 	ce := make(chan error)
@@ -138,32 +138,32 @@ func (scp *SecureCopier) scpToRemote(srcFile, dstUser, dstHost, dstFile string, 
 	go func() {
 		procWriter, err := session.StdinPipe()
 		if err != nil {
-			fmt.Fprintln(errPipe, err.Error())
+			fmt.Fprintln(scp.errPipe, err.Error())
 			ce <- err
 			return
 		}
 		defer procWriter.Close()
 		if scp.IsRecursive {
 			if srcFileInfo.IsDir() {
-				err = scp.processDir(procWriter, srcFile, srcFileInfo, outPipe, errPipe)
+				err = scp.processDir(procWriter, srcFile, srcFileInfo)
 			} else {
-				err = scp.sendFile(procWriter, srcFile, srcFileInfo, outPipe, errPipe)
+				err = scp.sendFile(procWriter, srcFile, srcFileInfo)
 			}
 		} else {
 			if srcFileInfo.IsDir() {
 				ce <- errors.New("Error: Not a regular file")
 				return
 			}
-			err = scp.sendFile(procWriter, srcFile, srcFileInfo, outPipe, errPipe)
+			err = scp.sendFile(procWriter, srcFile, srcFileInfo)
 
 		}
 		if err != nil {
-			fmt.Fprintln(errPipe, err.Error())
+			fmt.Fprintln(scp.errPipe, err.Error())
 			ce <- err
 		}
 		err = procWriter.Close()
 		if err != nil {
-			fmt.Fprintln(errPipe, err.Error())
+			fmt.Fprintln(scp.errPipe, err.Error())
 			ce <- err
 			return
 		}
@@ -171,7 +171,7 @@ func (scp *SecureCopier) scpToRemote(srcFile, dstUser, dstHost, dstFile string, 
 	go func() {
 		select {
 		case err, ok := <-ce:
-			fmt.Fprintln(errPipe, "Error:", err, ok)
+			fmt.Fprintln(scp.errPipe, "Error:", err, ok)
 			os.Exit(1)
 		}
 	}()
@@ -185,7 +185,7 @@ func (scp *SecureCopier) scpToRemote(srcFile, dstUser, dstHost, dstFile string, 
 	}
 	err = session.Run("/usr/bin/scp " + remoteOpts + " " + dstFile)
 	if err != nil {
-		fmt.Fprintln(errPipe, "Failed to run remote scp: "+err.Error())
+		fmt.Fprintln(scp.errPipe, "Failed to run remote scp: "+err.Error())
 	}
 	return err
 }
