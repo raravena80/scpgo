@@ -39,7 +39,7 @@ var RootCmd = &cobra.Command{
 	Long: `This is an SCP implementation in Go.
 `,
 	Run: func(cmd *cobra.Command, args []string) {
-		copier.Exec(args, os.Stdin, os.Stdout, os.Stderr)
+		copier.Exec(args)
 
 	},
 	Args:    cobra.ExactArgs(2),
@@ -54,6 +54,7 @@ func Execute() {
 }
 
 func init() {
+	copier := scp.NewSecureCopier()
 	cobra.OnInitialize(initConfig)
 	RootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.scpgo.yaml)")
 	RootCmd.Flags().BoolVarP(&copier.IsRecursive, "recursive", "r", false, "Recursive copy")

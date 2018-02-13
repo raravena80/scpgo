@@ -39,6 +39,17 @@ type SecureCopier struct {
 	dstHost           string
 	dstUser           string
 	dstFile           string
+	outPipe           io.Writer
+	errPipe           io.Writer
+	inPipe            io.Reader
+}
+
+func NewSecureCopier() SecureCopier {
+	scp := SecureCopier{}
+	scp.outPipe = os.Stdout
+	scp.errPipe = os.Stderr
+	scp.inPipe = os.Stdin
+	return scp
 }
 
 // Name Helper that returns name of the program
@@ -47,7 +58,7 @@ func (scp *SecureCopier) Name() string {
 }
 
 // Exec Main execution function
-func (scp *SecureCopier) Exec(args []string, inPipe io.Reader, outPipe io.Writer, errPipe io.Writer) (int, error) {
+func (scp *SecureCopier) Exec(args []string) (int, error) {
 
 	var err error
 
@@ -57,29 +68,29 @@ func (scp *SecureCopier) Exec(args []string, inPipe io.Reader, outPipe io.Writer
 	//err, status = scper.Exec(os.Stdin, os.Stdout, os.Stderr)
 	scp.srcFile, scp.srcHost, scp.srcUser, err = parseTarget(args[0])
 	if err != nil {
-		fmt.Fprintln(errPipe, "Error parsing source")
+		fmt.Fprintln(scp.errPipe, "Error parsing source")
 		return 1, err
 	}
 	scp.dstFile, scp.dstHost, scp.dstUser, err = parseTarget(args[1])
 	if err != nil {
-		fmt.Fprintln(errPipe, "Error parsing destination")
+		fmt.Fprintln(scp.errPipe, "Error parsing destination")
 		return 1, err
 	}
 
 	if scp.srcHost != "" && scp.dstHost != "" {
 		return 1, errors.New("remote->remote not implemented (yet)")
 	} else if scp.srcHost != "" {
-		err := scp.scpFromRemote(scp.srcUser, scp.srcHost, scp.srcFile, scp.dstFile, inPipe, outPipe, errPipe)
+		err := scp.scpFromRemote(scp.srcUser, scp.srcHost, scp.srcFile, scp.dstFile)
 		if err != nil {
-			fmt.Fprintln(errPipe, errPipe, "Failed to run 'from-remote' scp: "+err.Error())
+			fmt.Fprintln(scp.errPipe, "Failed to run 'from-remote' scp: "+err.Error())
 			return 1, err
 		}
 		return 0, nil
 
 	} else if scp.dstHost != "" {
-		err := scp.scpToRemote(scp.srcFile, scp.dstUser, scp.dstHost, scp.dstFile, outPipe, errPipe)
+		err := scp.scpToRemote(scp.srcFile, scp.dstUser, scp.dstHost, scp.dstFile)
 		if err != nil {
-			fmt.Fprintln(errPipe, "Failed to run 'to-remote' scp: "+err.Error())
+			fmt.Fprintln(scp.errPipe, "Failed to run 'to-remote' scp: "+err.Error())
 			return 1, err
 		}
 		return 0, nil
@@ -88,24 +99,24 @@ func (scp *SecureCopier) Exec(args []string, inPipe io.Reader, outPipe io.Writer
 	srcReader, err := os.Open(scp.srcFile)
 	defer srcReader.Close()
 	if err != nil {
-		fmt.Fprintln(errPipe, "Failed to open local source file ('local-local' scp): "+err.Error())
+		fmt.Fprintln(scp.errPipe, "Failed to open local source file ('local-local' scp): "+err.Error())
 		return 1, err
 	}
 	dstWriter, err := os.OpenFile(scp.dstFile, os.O_CREATE|os.O_WRONLY, 0777)
 	defer dstWriter.Close()
 	if err != nil {
-		fmt.Fprintln(errPipe, "Failed to open local destination file ('local-local' scp): "+err.Error())
+		fmt.Fprintln(scp.errPipe, "Failed to open local destination file ('local-local' scp): "+err.Error())
 		return 1, err
 	}
 	n, err := io.Copy(dstWriter, srcReader)
-	fmt.Fprintf(errPipe, "wrote %d bytes\n", n)
+	fmt.Fprintf(scp.errPipe, "wrote %d bytes\n", n)
 	if err != nil {
-		fmt.Fprintln(errPipe, "Failed to run 'local-local' copy: "+err.Error())
+		fmt.Fprintln(scp.errPipe, "Failed to run 'local-local' copy: "+err.Error())
 		return 1, err
 	}
 	err = dstWriter.Close()
 	if err != nil {
-		fmt.Fprintln(errPipe, "Failed to close local destination: "+err.Error())
+		fmt.Fprintln(scp.errPipe, "Failed to close local destination: "+err.Error())
 		return 1, err
 	}
 	return 0, nil

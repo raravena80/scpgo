@@ -29,7 +29,7 @@ import (
 )
 
 // scp FROM remote source
-func (scp *SecureCopier) scpFromRemote(srcUser, srcHost, srcFile, dstFile string, inPipe io.Reader, outPipe io.Writer, errPipe io.Writer) error {
+func (scp *SecureCopier) scpFromRemote(srcUser, srcHost, srcFile, dstFile string) error {
 	dstFileInfo, err := os.Stat(dstFile)
 	dstDir := dstFile
 	var useSpecifiedFilename bool
@@ -51,16 +51,16 @@ func (scp *SecureCopier) scpFromRemote(srcUser, srcHost, srcFile, dstFile string
 		useSpecifiedFilename = true
 	}
 	// from scp
-	session, err := sshconn.Connect(srcUser, srcHost, scp.Port, scp.KeyFile, scp.Password, scp.IsCheckKnownHosts, scp.IsVerbose, errPipe)
+	session, err := sshconn.Connect(srcUser, srcHost, scp.Port, scp.KeyFile, scp.Password, scp.IsCheckKnownHosts, scp.IsVerbose, scp.errPipe)
 	if err != nil {
 		return err
 	} else if scp.IsVerbose {
-		fmt.Fprintln(errPipe, "Got session")
+		fmt.Fprintln(scp.errPipe, "Got session")
 	}
 	defer session.Close()
 	ce := make(chan error)
 	// start the copy operation
-	go scp.doFromRemote(session, errPipe, outPipe, dstDir, dstFile, useSpecifiedFilename, ce)
+	go scp.doFromRemote(session, dstDir, dstFile, useSpecifiedFilename, ce)
 	remoteOpts := "-f"
 	if scp.IsQuiet {
 		remoteOpts += "q"
@@ -70,31 +70,31 @@ func (scp *SecureCopier) scpFromRemote(srcUser, srcHost, srcFile, dstFile string
 	}
 	err = session.Run("/usr/bin/scp " + remoteOpts + " " + srcFile)
 	if err != nil {
-		fmt.Fprintln(errPipe, "Failed to run remote scp: "+err.Error())
+		fmt.Fprintln(scp.errPipe, "Failed to run remote scp: "+err.Error())
 	}
 	return err
 }
 
-func (scp *SecureCopier) doFromRemote(session *ssh.Session, errPipe io.Writer, outPipe io.Writer, dstDir string, dstFile string, useSpecifiedFilename bool, ce chan<- error) {
+func (scp *SecureCopier) doFromRemote(session *ssh.Session, dstDir string, dstFile string, useSpecifiedFilename bool, ce chan<- error) {
 	cw, err := session.StdinPipe()
 	if err != nil {
-		fmt.Fprintln(errPipe, err.Error())
+		fmt.Fprintln(scp.errPipe, err.Error())
 		ce <- err
 		return
 	}
 	defer cw.Close()
 	r, err := session.StdoutPipe()
 	if err != nil {
-		fmt.Fprintln(errPipe, "session stdout err: "+err.Error()+" continue anyway")
+		fmt.Fprintln(scp.errPipe, "session stdout err: "+err.Error()+" continue anyway")
 		ce <- err
 		return
 	}
 	if scp.IsVerbose {
-		fmt.Fprintln(errPipe, "Sending null byte")
+		fmt.Fprintln(scp.errPipe, "Sending null byte")
 	}
 	err = sendByte(cw, 0)
 	if err != nil {
-		fmt.Fprintln(errPipe, "Write error: "+err.Error())
+		fmt.Fprintln(scp.errPipe, "Write error: "+err.Error())
 		ce <- err
 		return
 	}
@@ -109,80 +109,80 @@ func (scp *SecureCopier) doFromRemote(session *ssh.Session, errPipe io.Writer, o
 			if err == io.EOF {
 				// no problem.
 				if scp.IsVerbose {
-					fmt.Fprintln(errPipe, "Received EOF from remote server")
+					fmt.Fprintln(scp.errPipe, "Received EOF from remote server")
 				}
 			} else {
-				fmt.Fprintln(errPipe, "Error reading standard input:", err)
+				fmt.Fprintln(scp.errPipe, "Error reading standard input:", err)
 				ce <- err
 			}
 			return
 		}
 		if n < 1 {
-			fmt.Fprintln(errPipe, "Error reading next byte from standard input")
+			fmt.Fprintln(scp.errPipe, "Error reading next byte from standard input")
 			ce <- errors.New("Error reading next byte from standard input")
 			return
 		}
 		cmd := cmdArr[0]
 		if scp.IsVerbose {
-			fmt.Fprintf(errPipe, "Sink: %s (%v)\n", string(cmd), cmd)
+			fmt.Fprintf(scp.errPipe, "Sink: %s (%v)\n", string(cmd), cmd)
 		}
 		switch cmd {
 		case 0x0:
 			// continue
 			if scp.IsVerbose {
-				fmt.Fprintf(errPipe, "Received OK \n")
+				fmt.Fprintf(scp.errPipe, "Received OK \n")
 			}
 		case 'E':
 			// E command: go back out of dir
 			dstDir = filepath.Dir(dstDir)
 			if scp.IsVerbose {
-				fmt.Fprintf(errPipe, "Received End-Dir\n")
+				fmt.Fprintf(scp.errPipe, "Received End-Dir\n")
 			}
 			err = sendByte(cw, 0)
 			if err != nil {
-				fmt.Fprintln(errPipe, "Write error: "+err.Error())
+				fmt.Fprintln(scp.errPipe, "Write error: "+err.Error())
 				ce <- err
 				return
 			}
 		case 0xA:
 			// 0xA command: end?
 			if scp.IsVerbose {
-				fmt.Fprintf(errPipe, "Received All-done\n")
+				fmt.Fprintf(scp.errPipe, "Received All-done\n")
 			}
 
 			err = sendByte(cw, 0)
 			if err != nil {
-				fmt.Fprintln(errPipe, "Write error: "+err.Error())
+				fmt.Fprintln(scp.errPipe, "Write error: "+err.Error())
 				ce <- err
 				return
 			}
 
 			return
 		default:
-			scp.handleDefault(scanner, cmd, first, cw, r, n, errPipe, outPipe, dstDir, dstFile, useSpecifiedFilename, ce)
+			scp.handleDefault(scanner, cmd, first, cw, r, n, dstDir, dstFile, useSpecifiedFilename, ce)
 		}
 		first = false
 	}
 	err = cw.Close()
 	if err != nil {
-		fmt.Fprintln(errPipe, "error closing process writer: ", err.Error())
+		fmt.Fprintln(scp.errPipe, "error closing process writer: ", err.Error())
 		ce <- err
 		return
 	}
 }
 
 // This is kind of ugly but reduces complexity for now
-func (scp *SecureCopier) handleDefault(scanner *bufio.Scanner, cmd byte, first bool, cw io.WriteCloser, r io.Reader, n int, errPipe io.Writer, outPipe io.Writer, dstDir string, dstFile string, useSpecifiedFilename bool, ce chan<- error) {
+func (scp *SecureCopier) handleDefault(scanner *bufio.Scanner, cmd byte, first bool, cw io.WriteCloser, r io.Reader, n int, dstDir string, dstFile string, useSpecifiedFilename bool, ce chan<- error) {
 	scanner.Scan()
 	err := scanner.Err()
 	if err != nil {
 		if err == io.EOF {
 			// no problem.
 			if scp.IsVerbose {
-				fmt.Fprintln(errPipe, "Received EOF from remote server")
+				fmt.Fprintln(scp.errPipe, "Received EOF from remote server")
 			}
 		} else {
-			fmt.Fprintln(errPipe, "Error reading standard input:", err)
+			fmt.Fprintln(scp.errPipe, "Error reading standard input:", err)
 			ce <- err
 		}
 		return
@@ -190,33 +190,33 @@ func (scp *SecureCopier) handleDefault(scanner *bufio.Scanner, cmd byte, first b
 	// first line
 	cmdFull := scanner.Text()
 	if scp.IsVerbose {
-		fmt.Fprintf(errPipe, "Details: %v\n", cmdFull)
+		fmt.Fprintf(scp.errPipe, "Details: %v\n", cmdFull)
 	}
 	// remainder, split by spaces
 	parts := strings.SplitN(cmdFull, " ", 3)
 
 	switch cmd {
 	case 0x1:
-		fmt.Fprintf(errPipe, "Received error message: %s\n", cmdFull[1:])
+		fmt.Fprintf(scp.errPipe, "Received error message: %s\n", cmdFull[1:])
 		ce <- errors.New(cmdFull[1:])
 		return
 	case 'D', 'C':
 		mode, err := strconv.ParseInt(parts[0], 8, 32)
 		if err != nil {
-			fmt.Fprintln(errPipe, "Format error: "+err.Error())
+			fmt.Fprintln(scp.errPipe, "Format error: "+err.Error())
 			ce <- err
 			return
 		}
 		sizeUint, err := strconv.ParseUint(parts[1], 10, 64)
 		size := int64(sizeUint)
 		if err != nil {
-			fmt.Fprintln(errPipe, "Format error: "+err.Error())
+			fmt.Fprintln(scp.errPipe, "Format error: "+err.Error())
 			ce <- err
 			return
 		}
 		rcvFilename := parts[2]
 		if scp.IsVerbose {
-			fmt.Fprintf(errPipe, "Mode: %d, size: %d, filename: %s\n", mode, size, rcvFilename)
+			fmt.Fprintf(scp.errPipe, "Mode: %d, size: %d, filename: %s\n", mode, size, rcvFilename)
 		}
 		var filename string
 		// use the specified filename from the destination (only for top-level item)
@@ -227,7 +227,7 @@ func (scp *SecureCopier) handleDefault(scanner *bufio.Scanner, cmd byte, first b
 		}
 		err = sendByte(cw, 0)
 		if err != nil {
-			fmt.Fprintln(errPipe, "Send error: "+err.Error())
+			fmt.Fprintln(scp.errPipe, "Send error: "+err.Error())
 			ce <- err
 			return
 		}
@@ -235,16 +235,16 @@ func (scp *SecureCopier) handleDefault(scanner *bufio.Scanner, cmd byte, first b
 			// C command - file
 			thisDstFile := filepath.Join(dstDir, filename)
 			if scp.IsVerbose {
-				fmt.Fprintln(errPipe, "Creating destination file: ", thisDstFile)
+				fmt.Fprintln(scp.errPipe, "Creating destination file: ", thisDstFile)
 			}
 			tot := int64(0)
-			pb := NewProgressBarTo(filename, size, outPipe)
+			pb := NewProgressBarTo(filename, size, scp.outPipe)
 			pb.Update(0)
 
 			fw, err := os.Create(thisDstFile)
 			if err != nil {
 				ce <- err
-				fmt.Fprintln(errPipe, "File creation error: "+err.Error())
+				fmt.Fprintln(scp.errPipe, "File creation error: "+err.Error())
 				return
 			}
 			defer fw.Close()
@@ -259,7 +259,7 @@ func (scp *SecureCopier) handleDefault(scanner *bufio.Scanner, cmd byte, first b
 				b := make([]byte, bufferSize)
 				n, err = r.Read(b)
 				if err != nil {
-					fmt.Fprintln(errPipe, "Read error: "+err.Error())
+					fmt.Fprintln(scp.errPipe, "Read error: "+err.Error())
 					ce <- err
 					return
 				}
@@ -267,7 +267,7 @@ func (scp *SecureCopier) handleDefault(scanner *bufio.Scanner, cmd byte, first b
 				// write to file
 				_, err = fw.Write(b[:n])
 				if err != nil {
-					fmt.Fprintln(errPipe, "Write error: "+err.Error())
+					fmt.Fprintln(scp.errPipe, "Write error: "+err.Error())
 					ce <- err
 					return
 				}
@@ -280,7 +280,7 @@ func (scp *SecureCopier) handleDefault(scanner *bufio.Scanner, cmd byte, first b
 			// close file writer & check error
 			err = fw.Close()
 			if err != nil {
-				fmt.Fprintln(errPipe, err.Error())
+				fmt.Fprintln(scp.errPipe, err.Error())
 				ce <- err
 				return
 			}
@@ -288,34 +288,34 @@ func (scp *SecureCopier) handleDefault(scanner *bufio.Scanner, cmd byte, first b
 			nb := make([]byte, 1)
 			_, err = r.Read(nb)
 			if err != nil {
-				fmt.Fprintln(errPipe, err.Error())
+				fmt.Fprintln(scp.errPipe, err.Error())
 				ce <- err
 				return
 			}
 			// send null-byte back
 			_, err = cw.Write([]byte{0})
 			if err != nil {
-				fmt.Fprintln(errPipe, "Send null-byte error: "+err.Error())
+				fmt.Fprintln(scp.errPipe, "Send null-byte error: "+err.Error())
 				ce <- err
 				return
 			}
 			pb.Update(tot)
 			// new line
-			fmt.Fprintln(errPipe)
+			fmt.Fprintln(scp.errPipe)
 		} else {
 			// D command (directory)
 			thisDstFile := filepath.Join(dstDir, filename)
 			fileMode := os.FileMode(uint32(mode))
 			err = os.MkdirAll(thisDstFile, fileMode)
 			if err != nil {
-				fmt.Fprintln(errPipe, "Mkdir error: "+err.Error())
+				fmt.Fprintln(scp.errPipe, "Mkdir error: "+err.Error())
 				ce <- err
 				return
 			}
 			dstDir = thisDstFile
 		}
 	default:
-		fmt.Fprintf(errPipe, "Command '%v' NOT implemented\n", cmd)
+		fmt.Fprintf(scp.errPipe, "Command '%v' NOT implemented\n", cmd)
 		return
 	}
 }
