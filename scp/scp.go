@@ -65,7 +65,7 @@ func (scp *SecureCopier) Exec(args []string) (int, error) {
 	if scp.IsRemoteTo || scp.IsRemoteFrom {
 		return 1, errors.New("This scp does not implement 'remote-remote scp' yet")
 	}
-	//err, status = scper.Exec(os.Stdin, os.Stdout, os.Stderr)
+
 	scp.srcFile, scp.srcHost, scp.srcUser, err = parseTarget(args[0])
 	if err != nil {
 		fmt.Fprintln(scp.errPipe, "Error parsing source")
