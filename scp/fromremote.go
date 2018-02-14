@@ -29,9 +29,9 @@ import (
 )
 
 // scp FROM remote source
-func (scp *SecureCopier) scpFromRemote(srcUser, srcHost, srcFile, dstFile string) error {
-	dstFileInfo, err := os.Stat(dstFile)
-	dstDir := dstFile
+func (scp *SecureCopier) scpFromRemote() error {
+	dstFileInfo, err := os.Stat(scp.dstFile)
+	dstDir := scp.dstFile
 	var useSpecifiedFilename bool
 	if err != nil {
 		if !os.IsNotExist(err) {
@@ -42,16 +42,16 @@ func (scp *SecureCopier) scpFromRemote(srcUser, srcHost, srcFile, dstFile string
 	} else if dstFileInfo.IsDir() {
 		// ok - use name of srcFile
 		// dstFile = filepath.Join(dstFile, filepath.Base(srcFile))
-		dstDir = dstFile
+		dstDir = scp.dstFile
 		// MUST use received filename instead
 		// TODO should this be from USR?
 		useSpecifiedFilename = false
 	} else {
-		dstDir = filepath.Dir(dstFile)
+		dstDir = filepath.Dir(scp.dstFile)
 		useSpecifiedFilename = true
 	}
 	// from scp
-	session, err := sshconn.Connect(srcUser, srcHost, scp.Port, scp.KeyFile, scp.Password, scp.IsCheckKnownHosts, scp.IsVerbose, scp.errPipe)
+	session, err := sshconn.Connect(scp.srcUser, scp.srcHost, scp.Port, scp.KeyFile, scp.Password, scp.IsCheckKnownHosts, scp.IsVerbose, scp.errPipe)
 	if err != nil {
 		return err
 	} else if scp.IsVerbose {
@@ -60,7 +60,7 @@ func (scp *SecureCopier) scpFromRemote(srcUser, srcHost, srcFile, dstFile string
 	defer session.Close()
 	ce := make(chan error)
 	// start the copy operation
-	go scp.doFromRemote(session, dstDir, dstFile, useSpecifiedFilename, ce)
+	go scp.doFromRemote(session, dstDir, useSpecifiedFilename, ce)
 	remoteOpts := "-f"
 	if scp.IsQuiet {
 		remoteOpts += "q"
@@ -68,14 +68,14 @@ func (scp *SecureCopier) scpFromRemote(srcUser, srcHost, srcFile, dstFile string
 	if scp.IsRecursive {
 		remoteOpts += "r"
 	}
-	err = session.Run("/usr/bin/scp " + remoteOpts + " " + srcFile)
+	err = session.Run("/usr/bin/scp " + remoteOpts + " " + scp.srcFile)
 	if err != nil {
 		fmt.Fprintln(scp.errPipe, "Failed to run remote scp: "+err.Error())
 	}
 	return err
 }
 
-func (scp *SecureCopier) doFromRemote(session *ssh.Session, dstDir string, dstFile string, useSpecifiedFilename bool, ce chan<- error) {
+func (scp *SecureCopier) doFromRemote(session *ssh.Session, dstDir string, useSpecifiedFilename bool, ce chan<- error) {
 	cw, err := session.StdinPipe()
 	if err != nil {
 		fmt.Fprintln(scp.errPipe, err.Error())
@@ -159,7 +159,7 @@ func (scp *SecureCopier) doFromRemote(session *ssh.Session, dstDir string, dstFi
 
 			return
 		default:
-			scp.handleDefault(scanner, cmd, first, cw, r, n, dstDir, dstFile, useSpecifiedFilename, ce)
+			scp.handleDefault(scanner, cmd, first, cw, r, n, dstDir, useSpecifiedFilename, ce)
 		}
 		first = false
 	}
@@ -172,7 +172,7 @@ func (scp *SecureCopier) doFromRemote(session *ssh.Session, dstDir string, dstFi
 }
 
 // This is kind of ugly but reduces complexity for now
-func (scp *SecureCopier) handleDefault(scanner *bufio.Scanner, cmd byte, first bool, cw io.WriteCloser, r io.Reader, n int, dstDir string, dstFile string, useSpecifiedFilename bool, ce chan<- error) {
+func (scp *SecureCopier) handleDefault(scanner *bufio.Scanner, cmd byte, first bool, cw io.WriteCloser, r io.Reader, n int, dstDir string, useSpecifiedFilename bool, ce chan<- error) {
 	scanner.Scan()
 	err := scanner.Err()
 	if err != nil {
@@ -221,7 +221,7 @@ func (scp *SecureCopier) handleDefault(scanner *bufio.Scanner, cmd byte, first b
 		var filename string
 		// use the specified filename from the destination (only for top-level item)
 		if useSpecifiedFilename && first {
-			filename = filepath.Base(dstFile)
+			filename = filepath.Base(scp.dstFile)
 		} else {
 			filename = rcvFilename
 		}
