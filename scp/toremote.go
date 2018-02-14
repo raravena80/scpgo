@@ -117,14 +117,14 @@ func (scp *SecureCopier) sendFile(procWriter io.Writer, srcPath string, srcFileI
 }
 
 // to scp
-func (scp *SecureCopier) scpToRemote(srcFile, dstUser, dstHost, dstFile string) error {
+func (scp *SecureCopier) scpToRemote() error {
 
-	srcFileInfo, err := os.Stat(srcFile)
+	srcFileInfo, err := os.Stat(scp.srcFile)
 	if err != nil {
-		fmt.Fprintln(scp.errPipe, "Could not stat source file "+srcFile)
+		fmt.Fprintln(scp.errPipe, "Could not stat source file "+scp.srcFile)
 		return err
 	}
-	session, err := sshconn.Connect(dstUser, dstHost, scp.Port, scp.KeyFile, scp.Password, scp.IsCheckKnownHosts, scp.IsVerbose, scp.errPipe)
+	session, err := sshconn.Connect(scp.dstUser, scp.dstHost, scp.Port, scp.KeyFile, scp.Password, scp.IsCheckKnownHosts, scp.IsVerbose, scp.errPipe)
 	if err != nil {
 		return err
 	} else if scp.IsVerbose {
@@ -132,8 +132,8 @@ func (scp *SecureCopier) scpToRemote(srcFile, dstUser, dstHost, dstFile string) 
 	}
 	defer session.Close()
 	ce := make(chan error)
-	if dstFile == "" {
-		dstFile = filepath.Base(srcFile)
+	if scp.dstFile == "" {
+		scp.dstFile = filepath.Base(scp.srcFile)
 	}
 	go func() {
 		procWriter, err := session.StdinPipe()
@@ -145,16 +145,16 @@ func (scp *SecureCopier) scpToRemote(srcFile, dstUser, dstHost, dstFile string) 
 		defer procWriter.Close()
 		if scp.IsRecursive {
 			if srcFileInfo.IsDir() {
-				err = scp.processDir(procWriter, srcFile, srcFileInfo)
+				err = scp.processDir(procWriter, scp.srcFile, srcFileInfo)
 			} else {
-				err = scp.sendFile(procWriter, srcFile, srcFileInfo)
+				err = scp.sendFile(procWriter, scp.srcFile, srcFileInfo)
 			}
 		} else {
 			if srcFileInfo.IsDir() {
 				ce <- errors.New("Error: Not a regular file")
 				return
 			}
-			err = scp.sendFile(procWriter, srcFile, srcFileInfo)
+			err = scp.sendFile(procWriter, scp.srcFile, srcFileInfo)
 
 		}
 		if err != nil {
@@ -183,7 +183,7 @@ func (scp *SecureCopier) scpToRemote(srcFile, dstUser, dstHost, dstFile string) 
 	if scp.IsRecursive {
 		remoteOpts += "r"
 	}
-	err = session.Run("/usr/bin/scp " + remoteOpts + " " + dstFile)
+	err = session.Run("/usr/bin/scp " + remoteOpts + " " + scp.dstFile)
 	if err != nil {
 		fmt.Fprintln(scp.errPipe, "Failed to run remote scp: "+err.Error())
 	}

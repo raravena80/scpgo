@@ -80,7 +80,7 @@ func (scp *SecureCopier) Exec(args []string) (int, error) {
 	if scp.srcHost != "" && scp.dstHost != "" {
 		return 1, errors.New("remote->remote not implemented (yet)")
 	} else if scp.srcHost != "" {
-		err := scp.scpFromRemote(scp.srcUser, scp.srcHost, scp.srcFile, scp.dstFile)
+		err := scp.scpFromRemote()
 		if err != nil {
 			fmt.Fprintln(scp.errPipe, "Failed to run 'from-remote' scp: "+err.Error())
 			return 1, err
@@ -88,7 +88,7 @@ func (scp *SecureCopier) Exec(args []string) (int, error) {
 		return 0, nil
 
 	} else if scp.dstHost != "" {
-		err := scp.scpToRemote(scp.srcFile, scp.dstUser, scp.dstHost, scp.dstFile)
+		err := scp.scpToRemote()
 		if err != nil {
 			fmt.Fprintln(scp.errPipe, "Failed to run 'to-remote' scp: "+err.Error())
 			return 1, err
